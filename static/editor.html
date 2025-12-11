@@ -16,7 +16,9 @@ pre { margin: 0; white-space: pre-wrap; }
 .red { background-color: #ffb3b3; }
 </style>
 
+<!-- ACE editor -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+<script src="/static/ws-client.js"></script>
 </head>
 
 <body>
@@ -54,137 +56,99 @@ pre { margin: 0; white-space: pre-wrap; }
 </table>
 
 <script>
-// ---------------------------------------------
-// Inicializace editoru
-// ---------------------------------------------
+// ------------------------------
+// Inicializace ACE editoru
+// ------------------------------
 let editor = ace.edit("editor");
 editor.session.setMode("ace/mode/json");
 editor.setOption("fontSize", "14px");
 
-// metadata o tom, který preset je nahraný
+// metadata o nahraném preset
 editor.dataset.module = "ARC";
 editor.dataset.version = "A";
 
-
-// ---------------------------------------------
-// Přesné a funkční presety
-// ---------------------------------------------
+// ------------------------------
+// Presety
+// ------------------------------
 const presets = {
   ARC: {
-    A: {
-      signals: { CN:{concentration:0.60}, RU:{entropy:0.30}, US:{profit_bias:0.40} },
-      adapt_delta: { cn:0.01, ru:-0.01, us:0.0 }
-    },
-    B: {
-      signals: { CN:{concentration:0.90}, RU:{entropy:0.10}, US:{profit_bias:0.20} },
-      adapt_delta: { cn:0.03, ru:-0.02, us:-0.01 }
-    }
+    A: { signals: { CN:{concentration:0.60}, RU:{entropy:0.30}, US:{profit_bias:0.40} }, adapt_delta: { cn:0.01, ru:-0.01, us:0.0 } },
+    B: { signals: { CN:{concentration:0.90}, RU:{entropy:0.10}, US:{profit_bias:0.20} }, adapt_delta: { cn:0.03, ru:-0.02, us:-0.01 } }
   },
   CR: {
-    A: {
-      signals: { CN:{concentration:0.20}, RU:{entropy:0.80}, US:{profit_bias:0.50} },
-      adapt_delta: { cn:-0.01, ru:0.03, us:0.01 }
-    },
-    B: {
-      signals: { CN:{concentration:0.10}, RU:{entropy:0.95}, US:{profit_bias:0.70} },
-      adapt_delta: { cn:-0.02, ru:0.05, us:0.02 }
-    }
+    A: { signals: { CN:{concentration:0.20}, RU:{entropy:0.80}, US:{profit_bias:0.50} }, adapt_delta: { cn:-0.01, ru:0.03, us:0.01 } },
+    B: { signals: { CN:{concentration:0.10}, RU:{entropy:0.95}, US:{profit_bias:0.70} }, adapt_delta: { cn:-0.02, ru:0.05, us:0.02 } }
   },
   NUR: {
-    A: {
-      signals: { CN:{concentration:0.50}, RU:{entropy:0.55}, US:{profit_bias:0.45} },
-      adapt_delta: { cn:0.00, ru:0.00, us:0.00 }
-    },
-    B: {
-      signals: { CN:{concentration:0.70}, RU:{entropy:0.30}, US:{profit_bias:0.50} },
-      adapt_delta: { cn:0.02, ru:-0.02, us:0.01 }
-    }
+    A: { signals: { CN:{concentration:0.50}, RU:{entropy:0.55}, US:{profit_bias:0.45} }, adapt_delta: { cn:0.00, ru:0.00, us:0.00 } },
+    B: { signals: { CN:{concentration:0.70}, RU:{entropy:0.30}, US:{profit_bias:0.50} }, adapt_delta: { cn:0.02, ru:-0.02, us:0.01 } }
   }
 };
 
-
-// ---------------------------------------------
-// Funkce pro načtení presetů
-// ---------------------------------------------
+// ------------------------------
+// Načtení preset
+// ------------------------------
 function loadSample(module, version) {
   const data = presets[module][version];
-
   editor.dataset.module = module;
   editor.dataset.version = version;
-
-  // kritický řádek: správné umístění, funguje spolehlivě
   editor.setValue(JSON.stringify(data, null, 2), -1);
 }
 
-
-// ---------------------------------------------
-// Lokální simulace výstupů (nahrazuje API)
-// ---------------------------------------------
+// ------------------------------
+// Simulace výstupu
+// ------------------------------
 function simulateOutput(module, payload){
   const s = payload.signals;
   const d = payload.adapt_delta;
-
-  if(module === "ARC"){
-    let rel = 1 - (s.RU.entropy * 0.6) + (s.CN.concentration * 0.4) - Math.abs(d.ru)*0.5;
+  if(module==="ARC"){
+    let rel = 1 - (s.RU.entropy*0.6) + (s.CN.concentration*0.4) - Math.abs(d.ru)*0.5;
     rel = Math.max(0, Math.min(1, rel));
     return { out:{ reliability: rel }, comment: rel>0.7?"Stabilní a konzistentní.":"Narušená jistota." };
   }
-
-  if(module === "CR"){
+  if(module==="CR"){
     let ch = s.RU.entropy*0.7 + (1-s.CN.concentration)*0.3 + Math.abs(d.ru)*0.4;
     ch = Math.max(0, Math.min(1, ch));
     return { out:{ chaos: ch }, comment: ch>0.7?"Vysoký chaos.":"Řízený chaos." };
   }
-
-  if(module === "NUR"){
+  if(module==="NUR"){
     let st = (s.CN.concentration*0.4)+(1-s.RU.entropy)*0.4 - Math.abs(d.cn)*0.2;
     st = Math.max(0, Math.min(1, st));
     return { out:{ stability: st }, comment: st>0.7?"Vysoká osobní stabilita.":"Kolísání stability." };
   }
 }
 
-
-// ---------------------------------------------
-// Barvení výsledku
-// ---------------------------------------------
+// ------------------------------
+// Barvy hodnot
+// ------------------------------
 function colorCell(val){
   if(val>0.7) return "green";
   if(val>0.4) return "orange";
   return "red";
 }
 
-
-// ---------------------------------------------
-// Vyhodnocení – simulace API
-// ---------------------------------------------
+// ------------------------------
+// Vyhodnocení
+// ------------------------------
 function send(){
   let mod = editor.dataset.module;
   let ver = editor.dataset.version;
-
   let payload;
-  try { payload = JSON.parse(editor.getValue()); }
-  catch(e){
-    alert("Neplatný JSON!");
-    return;
-  }
-
+  try { payload = JSON.parse(editor.getValue()); } catch(e){ alert("Neplatný JSON"); return; }
   let result = simulateOutput(mod, payload);
   let numericValue = Object.values(result.out)[0];
 
   let row = document.querySelector("#respTable tbody").insertRow(-1);
-
   row.insertCell(0).innerText = mod;
   row.insertCell(1).innerText = ver;
-
-  row.insertCell(2).innerHTML = "<pre>"+JSON.stringify(payload, null, 2)+"</pre>";
+  row.insertCell(2).innerHTML = "<pre>"+JSON.stringify(payload,null,2)+"</pre>";
 
   const outCell = row.insertCell(3);
-  outCell.innerHTML = "<pre>"+JSON.stringify(result.out, null, 2)+"</pre>";
+  outCell.innerHTML = "<pre>"+JSON.stringify(result.out,null,2)+"</pre>";
   outCell.className = colorCell(numericValue);
 
   row.insertCell(4).innerText = result.comment;
 }
-
 </script>
 
 </body>

@@ -1,5 +1,4 @@
 # main.py
-
 import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.responses import FileResponse
@@ -17,6 +16,8 @@ app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 @app.get("/editor", include_in_schema=False)
 def serve_editor():
     editor_path = os.path.join(STATIC_DIR, "editor.html")
+    if not os.path.exists(editor_path):
+        return {"error": "editor.html not found in static folder"}
     return FileResponse(editor_path)
 
 # ------------------------
@@ -31,18 +32,16 @@ class ConnectionManager:
         self.active_connections.append(websocket)
 
     def disconnect(self, websocket: WebSocket):
-        try:
+        if websocket in self.active_connections:
             self.active_connections.remove(websocket)
-        except ValueError:
-            pass
 
     async def broadcast(self, message: str):
         living = []
-        for connection in self.active_connections:
+        for conn in self.active_connections:
             try:
-                await connection.send_text(message)
-                living.append(connection)
-            except RuntimeError:
+                await conn.send_text(message)
+                living.append(conn)
+            except Exception:
                 pass
         self.active_connections = living
 
@@ -54,12 +53,13 @@ async def websocket_nur(websocket: WebSocket):
     try:
         while True:
             payload = await websocket.receive_text()
+            # echo payload zpět klientovi
             await websocket.send_text(f"Echo: {payload}")
     except WebSocketDisconnect:
         manager.disconnect(websocket)
 
 # ------------------------
-# Lokální run
+# Lokální run / Railway port
 # ------------------------
 if __name__ == "__main__":
     import uvicorn
