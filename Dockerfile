@@ -1,18 +1,18 @@
-
+# Base image
 FROM python:3.11-slim
 
-# nastavení pracovního adresáře
+# Nastavení pracovního adresáře
 WORKDIR /app
 
-# zkopíruj vše do kontejneru
+# Zkopíruj vše do kontejneru
 COPY . /app
 
-# aktualizace a instalace uvicorn + fastapi + dependencies
+# Instalace Python dependencies
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir fastapi uvicorn[standard] pydantic
 
-# Railway používá port 8000 implicitně
+# Railway používá dynamický port přes proměnnou PORT
 EXPOSE 8000
 
-# start FastAPI serveru
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+# Start serveru s podporou dynamického portu
+CMD ["sh", "-c", "uvicorn main:app --host 0.0.0.0 --port ${PORT:-8000}"]
