@@ -5,6 +5,7 @@ from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title='DEAT ARC–NUR Stabilizer', version='0.2')
 
+static_dir = "static"
 # Mount statických souborů
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
