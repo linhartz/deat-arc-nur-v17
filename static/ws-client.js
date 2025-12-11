@@ -4,7 +4,7 @@ let ws = null;
 
 function connectWS() {
     const proto = location.protocol === "https:" ? "wss://" : "ws://";
-    const url = proto + location.host + "/ws";
+    const url = proto + location.host + "/ws/nur";  // Opraven endpoint
 
     ws = new WebSocket(url);
 
