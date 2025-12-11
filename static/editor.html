@@ -131,23 +131,12 @@ function colorCell(val){
 // Vyhodnocení
 // ------------------------------
 function send(){
-  let mod = editor.dataset.module;
-  let ver = editor.dataset.version;
-  let payload;
-  try { payload = JSON.parse(editor.getValue()); } catch(e){ alert("Neplatný JSON"); return; }
-  let result = simulateOutput(mod, payload);
-  let numericValue = Object.values(result.out)[0];
+    let mod = editor.dataset.module;
+    let ver = editor.dataset.version;
+    let payload;
+    try { payload = JSON.parse(editor.getValue()); } catch(e){ alert("Neplatný JSON"); return; }
 
-  let row = document.querySelector("#respTable tbody").insertRow(-1);
-  row.insertCell(0).innerText = mod;
-  row.insertCell(1).innerText = ver;
-  row.insertCell(2).innerHTML = "<pre>"+JSON.stringify(payload,null,2)+"</pre>";
-
-  const outCell = row.insertCell(3);
-  outCell.innerHTML = "<pre>"+JSON.stringify(result.out,null,2)+"</pre>";
-  outCell.className = colorCell(numericValue);
-
-  row.insertCell(4).innerText = result.comment;
+    sendPayloadWS(payload, mod, ver);
 }
 </script>
 
