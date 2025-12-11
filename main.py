@@ -5,17 +5,18 @@ from fastapi.staticfiles import StaticFiles
 
 app = FastAPI(title='DEAT ARC–NUR Stabilizer', version='0.2')
 
-# Statické soubory
-static_dir = "static"
-app.mount("/static", StaticFiles(directory=static_dir), name="static")
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+STATIC_DIR = os.path.join(BASE_DIR, "static")
+
+# Mount statických souborů
+app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
 
 # /editor endpoint
 @app.get("/editor", include_in_schema=False)
 def serve_editor():
-    editor_path = os.path.join(static_dir, "editor.html")
-    if not os.path.exists(editor_path):
-        return {"error": "editor.html not found in static folder"}
+    editor_path = os.path.join(STATIC_DIR, "editor.html")
     return FileResponse(editor_path)
+
 
 # ------------------------
 # WebSocket manager
