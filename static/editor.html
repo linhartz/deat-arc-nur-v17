@@ -3,7 +3,15 @@
 <head>
 <meta charset='utf-8'/>
 <title>DEAT JSON Editor</title>
-<style>body{font-family:Arial;margin:20px} #editor{height:400px;border:1px solid #ccc}</style>
+<style>
+body { font-family: Arial; margin: 20px }
+#editor { height: 200px; border: 1px solid #ccc; margin-bottom: 10px; }
+table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+table, th, td { border: 1px solid #ccc; padding: 8px; text-align: left; }
+th { background-color: #f2f2f2; }
+.comment { font-style: italic; color: #555; }
+button { margin-right: 5px; }
+</style>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.9.6/ace.js"></script>
 <script src="/static/ws-client.js"></script>
 </head>
@@ -11,39 +19,104 @@
 <h3>DEAT JSON Editor</h3>
 <p>Vyber endpoint a odešli JSON payload.</p>
 <select id="endpoint">
-<option value="/arc">/arc</option>
-<option value="/cr">/cr</option>
-<option value="/nur">/nur</option>
+  <option value="/arc">ARC</option>
+  <option value="/cr">CR</option>
+  <option value="/nur">NUR</option>
 </select>
 <button onclick="send()">Send</button>
 <button onclick="loadSample()">Load sample</button>
+
 <div id="editor">{
-"signals": {
-"CN": {"concentration": 0.6},
-"RU": {"entropy": 0.3},
-"US": {"profit_bias": 0.4}
-},
-"adapt_delta": {"cn": 0.01, "ru": -0.01, "us": 0.0}
-}
-</div>
-<h4>Response</h4>
-<pre id="response"></pre>
+  "signals": {
+    "CN": {"concentration": 0.6},
+    "RU": {"entropy": 0.3},
+    "US": {"profit_bias": 0.4}
+  },
+  "adapt_delta": {"cn": 0.01, "ru": -0.01, "us": 0.0}
+}</div>
+
+<h4>Response Table</h4>
+<table id="resultTable">
+  <thead>
+    <tr>
+      <th>Module</th>
+      <th>Input</th>
+      <th>Output</th>
+      <th>AI Comment</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+</table>
+
 <script>
 var editor = ace.edit('editor');
 editor.session.setMode('ace/mode/json');
 editor.setValue(editor.getValue(), -1);
-function send(){
-var endpoint = document.getElementById('endpoint').value;
-var payload = editor.getValue();
-fetch(endpoint, {
-method:'POST', headers:{'Content-Type':'application/json'}, body: payload
-}).then(r=>r.json()).then(j=>document.getElementById('response').innerText = JSON.stringify(j, null, 2)).catch(e=>document.getElementById('response').innerText = e);
+
+function formatJSON(obj) {
+  return JSON.stringify(obj, null, 2);
 }
-function loadSample(){
-editor.setValue(JSON.stringify({
-signals:{CN:{concentration:0.85},RU:{entropy:0.4},US:{profit_bias:0.6}},
-adapt_delta:{cn:0.02,ru:-0.01,us:0.0}
-}, null, 2), -1);
+
+function aiComment(module, input, output) {
+  if (module === 'ARC') {
+    let reliability = output.reliability ?? 0;
+    return `Reliability ${reliability.toFixed(2)} (delta CN:${input.adapt_delta?.cn}, RU:${input.adapt_delta?.ru}, US:${input.adapt_delta?.us})`;
+  } else if (module === 'CR') {
+    let cr_scalar = output.cr_scalar ?? 0;
+    let flags = (output.flags || []).join(', ');
+    return `CR scalar ${cr_scalar.toFixed(2)}, flags: ${flags}`;
+  } else if (module === 'NUR') {
+    let stability = output.nur_stability ?? 0;
+    let target = output.target ?? 0;
+    return `Current stability ${stability.toFixed(2)}, target ${target}`;
+  }
+  return '';
+}
+
+function send() {
+  let endpoint = document.getElementById('endpoint').value;
+  let payload = editor.getValue();
+  let tbody = document.getElementById('resultTable').querySelector('tbody');
+  tbody.innerHTML = '';
+
+  fetch(endpoint, {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: payload
+  })
+  .then(r => r.json())
+  .then(j => {
+    let inputObj;
+    try { inputObj = JSON.parse(payload); } catch { inputObj = {}; }
+    let row = document.createElement('tr');
+
+    let moduleCell = document.createElement('td');
+    moduleCell.textContent = endpoint.toUpperCase().replace('/','');
+    row.appendChild(moduleCell);
+
+    let inputCell = document.createElement('td');
+    inputCell.textContent = formatJSON(inputObj);
+    row.appendChild(inputCell);
+
+    let outputCell = document.createElement('td');
+    outputCell.textContent = formatJSON(j);
+    row.appendChild(outputCell);
+
+    let commentCell = document.createElement('td');
+    commentCell.textContent = aiComment(moduleCell.textContent, inputObj, j);
+    commentCell.className = 'comment';
+    row.appendChild(commentCell);
+
+    tbody.appendChild(row);
+  })
+  .catch(e => alert('Error: ' + e));
+}
+
+function loadSample() {
+  editor.setValue(JSON.stringify({
+    signals: { CN:{concentration:0.85}, RU:{entropy:0.4}, US:{profit_bias:0.6} },
+    adapt_delta: { cn:0.02, ru:-0.01, us:0.0 }
+  }, null, 2), -1);
 }
 </script>
 </body>
