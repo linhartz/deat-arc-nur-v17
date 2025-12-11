@@ -1,0 +1,49 @@
+<!doctype html>
+<html>
+<head>
+<meta charset='utf-8'/>
+<title>DEAT JSON Editor</title>
+<style>body{font-family:Arial;margin:20px} #editor{height:400px;border:1px solid #ccc}</style>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.9.6/ace.js"></script>
+</head>
+<body>
+<h3>DEAT JSON Editor</h3>
+<p>Vyber endpoint a odešli JSON payload.</p>
+<select id="endpoint">
+<option value="/arc">/arc</option>
+<option value="/cr">/cr</option>
+<option value="/nur">/nur</option>
+</select>
+<button onclick="send()">Send</button>
+<button onclick="loadSample()">Load sample</button>
+<div id="editor">{
+"signals": {
+"CN": {"concentration": 0.6},
+"RU": {"entropy": 0.3},
+"US": {"profit_bias": 0.4}
+},
+"adapt_delta": {"cn": 0.01, "ru": -0.01, "us": 0.0}
+}
+</div>
+<h4>Response</h4>
+<pre id="response"></pre>
+<script>
+var editor = ace.edit('editor');
+editor.session.setMode('ace/mode/json');
+editor.setValue(editor.getValue(), -1);
+function send(){
+var endpoint = document.getElementById('endpoint').value;
+var payload = editor.getValue();
+fetch(endpoint, {
+method:'POST', headers:{'Content-Type':'application/json'}, body: payload
+}).then(r=>r.json()).then(j=>document.getElementById('response').innerText = JSON.stringify(j, null, 2)).catch(e=>document.getElementById('response').innerText = e);
+}
+function loadSample(){
+editor.setValue(JSON.stringify({
+signals:{CN:{concentration:0.85},RU:{entropy:0.4},US:{profit_bias:0.6}},
+adapt_delta:{cn:0.02,ru:-0.01,us:0.0}
+}, null, 2), -1);
+}
+</script>
+</body>
+</html>
