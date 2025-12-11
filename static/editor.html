@@ -65,6 +65,7 @@ editor.setOption("fontSize", "14px");
 editor.dataset.module = "ARC";
 editor.dataset.version = "A";
 
+
 // ---------------------------------------------
 // Přesné a funkční presety
 // ---------------------------------------------
@@ -101,22 +102,23 @@ const presets = {
   }
 };
 
+
 // ---------------------------------------------
 // Funkce pro načtení presetů
 // ---------------------------------------------
 function loadSample(module, version) {
   const data = presets[module][version];
 
-  // uložíme do datasetu
   editor.dataset.module = module;
   editor.dataset.version = version;
 
-  // ⭐ ZDE: správně fungující editor.setValue
+  // kritický řádek: správné umístění, funguje spolehlivě
   editor.setValue(JSON.stringify(data, null, 2), -1);
 }
 
+
 // ---------------------------------------------
-// Simulační funkce (lokální náhrada API)
+// Lokální simulace výstupů (nahrazuje API)
 // ---------------------------------------------
 function simulateOutput(module, payload){
   const s = payload.signals;
@@ -141,8 +143,9 @@ function simulateOutput(module, payload){
   }
 }
 
+
 // ---------------------------------------------
-// Barvy hodnot
+// Barvení výsledku
 // ---------------------------------------------
 function colorCell(val){
   if(val>0.7) return "green";
@@ -150,8 +153,9 @@ function colorCell(val){
   return "red";
 }
 
+
 // ---------------------------------------------
-// Vyhodnocení (simulace API)
+// Vyhodnocení – simulace API
 // ---------------------------------------------
 function send(){
   let mod = editor.dataset.module;
@@ -159,7 +163,10 @@ function send(){
 
   let payload;
   try { payload = JSON.parse(editor.getValue()); }
-  catch(e){ alert("Neplatný JSON"); return; }
+  catch(e){
+    alert("Neplatný JSON!");
+    return;
+  }
 
   let result = simulateOutput(mod, payload);
   let numericValue = Object.values(result.out)[0];
