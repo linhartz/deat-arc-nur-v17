@@ -1,154 +1,187 @@
-<!doctype html>
-<html>
+<!DOCTYPE html>
+<html lang="cs">
 <head>
-<meta charset='utf-8'/>
-<title>DEAT JSON Editor + Table</title>
+<meta charset="UTF-8"/>
+<title>ARC / CR / NUR Editor</title>
 <style>
-  body{font-family:Arial;margin:20px}
-  #editor{height:200px;border:1px solid #ccc;margin-bottom:10px;}
-  table{border-collapse:collapse;width:100%;margin-top:20px;}
-  th, td{border:1px solid #ccc;padding:4px;text-align:left;vertical-align:top;}
-  button{margin:2px;}
-  pre{margin:0;}
-  .green{background-color:#c6efce;}
-  .yellow{background-color:#ffeb9c;}
-  .red{background-color:#f4c7c3;}
+body { font-family: Arial; margin: 20px; }
+#editor { width: 600px; height: 300px; border: 1px solid #888; }
+button { margin: 4px; padding: 6px 10px; }
+table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+th,td { border: 1px solid #ccc; padding: 6px; vertical-align: top; }
+pre { margin: 0; white-space: pre-wrap; }
+.green { background: #c7f9cc; }
+.orange { background: #ffe29a; }
+.red { background: #ffb3b3; }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.9.6/ace.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
 </head>
 <body>
-<h3>DEAT JSON Editor + Response Table</h3>
-<select id="endpoint">
-  <option value="/arc">ARC</option>
-  <option value="/cr">CR</option>
-  <option value="/nur">NUR</option>
-</select>
-<button onclick="send()">Send (Simulate)</button>
 
-<h4>Load Sample Payloads</h4>
-<!-- ARC buttons -->
-<button onclick="loadARCv1()">ARC v1</button>
-<button onclick="loadARCv2()">ARC v2</button>
-<!-- CR buttons -->
-<button onclick="loadCRv1()">CR v1</button>
-<button onclick="loadCRv2()">CR v2</button>
-<!-- NUR buttons -->
-<button onclick="loadNURv1()">NUR v1</button>
-<button onclick="loadNURv2()">NUR v2</button>
+<h2>JSON Editor – ARC / CR / NUR</h2>
 
-<div id="editor">{} </div>
+<div id="editor"></div>
 
-<h4>Response Table</h4>
+<h3>Přednastavené alternativy</h3>
+
+<button onclick="loadSample('ARC','A')">ARC – varianta A</button>
+<button onclick="loadSample('ARC','B')">ARC – varianta B</button>
+
+<button onclick="loadSample('CR','A')">CR – varianta A</button>
+<button onclick="loadSample('CR','B')">CR – varianta B</button>
+
+<button onclick="loadSample('NUR','A')">NUR – varianta A</button>
+<button onclick="loadSample('NUR','B')">NUR – varianta B</button>
+
+<button onclick="send()">Vyhodnotit</button>
+
+<h3>Výsledky</h3>
 <table id="respTable">
+<thead>
 <tr>
-  <th>Module</th>
-  <th>Version</th>
-  <th>Input</th>
-  <th>Output</th>
-  <th>AI Comment</th>
+  <th>Modul</th>
+  <th>Varianta</th>
+  <th>Vstup</th>
+  <th>Výstup</th>
+  <th>Komentář AI</th>
 </tr>
+</thead>
+<tbody></tbody>
 </table>
 
 <script>
-var editor = ace.edit('editor');
-editor.session.setMode('ace/mode/json');
-editor.setValue('{}', -1);
+// ------------------------------------------------------------
+// Editor
+// ------------------------------------------------------------
+let editor = ace.edit("editor");
+editor.session.setMode("ace/mode/json");
+editor.dataset.module = "ARC";
+editor.dataset.version = "A";
 
-let table = document.getElementById('respTable');
-
-// --- Sample payloads ---
-const samples = {
-  ARC: [
-    {v:"v1", payload:{signals:{CN:{concentration:0.9},RU:{entropy:0.1},US:{profit_bias:0.5}}, adapt_delta:{cn:0.01,ru:-0.01,us:0}}},
-    {v:"v2", payload:{signals:{CN:{concentration:0.5},RU:{entropy:0.7},US:{profit_bias:0.2}}, adapt_delta:{cn:0,ru:0.02,us:-0.01}}}
-  ],
-  CR: [
-    {v:"v1", payload:{provocations:[{intensity:0.2, source_type:"individual", vector:"social", confidence:0.8},{intensity:0.3, source_type:"individual", vector:"financial", confidence:0.9}]}},
-    {v:"v2", payload:{provocations:[{intensity:0.6, source_type:"state", vector:"media", confidence:0.7},{intensity:0.8, source_type:"agency", vector:"politics", confidence:0.5},{intensity:0.5, source_type:"individual", vector:"finance", confidence:0.4}]}}
-  ],
-  NUR: [
-    {v:"v1", payload:{assets:{real_estate:50000,savings:20000,stocks:10000}, passive_income:2000, active_input:500}},
-    {v:"v2", payload:{assets:{real_estate:20000,savings:5000,stocks:2000}, passive_income:500, active_input:2000}}
-  ]
+// ------------------------------------------------------------
+// Přednastavené payloady
+// ------------------------------------------------------------
+const presets = {
+  ARC: {
+    A: {
+      signals:{ CN:{concentration:0.60}, RU:{entropy:0.30}, US:{profit_bias:0.40} },
+      adapt_delta:{ cn:0.01, ru:-0.01, us:0.0 }
+    },
+    B: {
+      signals:{ CN:{concentration:0.90}, RU:{entropy:0.10}, US:{profit_bias:0.20} },
+      adapt_delta:{ cn:0.03, ru:-0.02, us:-0.01 }
+    }
+  },
+  CR: {
+    A: {
+      signals:{ CN:{concentration:0.20}, RU:{entropy:0.80}, US:{profit_bias:0.50} },
+      adapt_delta:{ cn:-0.01, ru:0.03, us:0.01 }
+    },
+    B: {
+      signals:{ CN:{concentration:0.10}, RU:{entropy:0.95}, US:{profit_bias:0.70} },
+      adapt_delta:{ cn:-0.02, ru:0.05, us:0.02 }
+    }
+  },
+  NUR: {
+    A: {
+      signals:{ CN:{concentration:0.50}, RU:{entropy:0.55}, US:{profit_bias:0.45} },
+      adapt_delta:{ cn:0.00, ru:0.00, us:0.00 }
+    },
+    B: {
+      signals:{ CN:{concentration:0.70}, RU:{entropy:0.30}, US:{profit_bias:0.50} },
+      adapt_delta:{ cn:0.02, ru:-0.02, us:0.01 }
+    }
+  }
 };
 
-// --- Load functions ---
-function loadSample(mod, idx){
-  editor.setValue(JSON.stringify(samples[mod][idx].payload, null,2), -1);
+// ------------------------------------------------------------
+// Načtení vzorku
+// ------------------------------------------------------------
+function loadSample(mod, ver){
   editor.dataset.module = mod;
-  editor.dataset.version = samples[mod][idx].v;
+  editor.dataset.version = ver;
+  editor.setValue(JSON.stringify(presets[mod][ver], null, 2), -1);
 }
 
-function loadARCv1(){loadSample("ARC",0);}
-function loadARCv2(){loadSample("ARC",1);}
-function loadCRv1(){loadSample("CR",0);}
-function loadCRv2(){loadSample("CR",1);}
-function loadNURv1(){loadSample("NUR",0);}
-function loadNURv2(){loadSample("NUR",1);}
-
-// --- Simulate outputs with colors ---
+// ------------------------------------------------------------
+// Výpočet simulovaných výsledků
+// ------------------------------------------------------------
 function simulateOutput(module, payload){
-  let out={}, comment="";
-  if(module==="ARC"){
-    let s=payload.signals;
-    out.reliability=1-(0.33*s.CN.concentration +0.33*s.RU.entropy +0.33*s.US.profit_bias);
-    comment="Nižší hodnota = vyšší vliv RU; CN silně ovlivňuje stabilitu.";
+  const s = payload.signals;
+  const d = payload.adapt_delta;
+
+  if(module === "ARC"){
+    let reliability = 1 - (s.RU.entropy * 0.6) + (s.CN.concentration * 0.4) - Math.abs(d.ru)*0.5;
+    reliability = Math.max(0, Math.min(1, reliability));
+    return {
+      out:{ reliability: reliability },
+      comment: reliability>0.7 ?
+        "Systém je stabilní, signály jsou konzistentní." :
+        "Zvýšená entropie nebo korekce snižují jistotu."
+    };
   }
-  else if(module==="CR"){
-    let prov=payload.provocations||[];
-    let total=prov.reduce((acc,p)=>acc+(p.intensity||0),0);
-    let avgConf=prov.reduce((acc,p)=>acc+(p.confidence||0),0)/Math.max(prov.length,1);
-    out.chaos=Math.min(1,total/3);
-    comment="Vyšší chaos a nízká průměrná důvěra zvyšují CR riziko.";
+
+  if(module === "CR"){
+    let chaos = s.RU.entropy*0.7 + (1-s.CN.concentration)*0.3 + Math.abs(d.ru)*0.4;
+    chaos = Math.max(0, Math.min(1, chaos));
+    return {
+      out:{ chaos: chaos },
+      comment: chaos>0.7 ?
+        "Systém je velmi chaotický, vysoká entropie." :
+        "Chaotičnost je mírná nebo kontrolovaná."
+    };
   }
-  else if(module==="NUR"){
-    let assetsSum=Object.values(payload.assets||{}).reduce((a,b)=>a+b,0);
-    out.stability=assetsSum*0.4 + (payload.passive_income||0)*0.4 + (payload.active_input||0)*0.2;
-    comment="Nižší aktiva nebo pasivní příjem vyžadují zvýšení aktivního vstupu.";
+
+  if(module === "NUR"){
+    let stability = (s.CN.concentration*0.4) + ((1-s.RU.entropy)*0.4) - Math.abs(d.cn)*0.2;
+    stability = Math.max(0, Math.min(1, stability));
+    return {
+      out:{ stability: stability },
+      comment: stability>0.7 ?
+        "Osobní stabilita je vysoká, vlivy jsou pod kontrolou." :
+        "Stabilita kolísá, zvaž úpravu přístupů."
+    };
   }
-  return {out, comment};
 }
 
-function colorCell(module, value){
-  if(module==="ARC"){
-    if(value>0.7) return "green";
-    if(value>0.4) return "yellow";
-    return "red";
-  }
-  if(module==="CR"){
-    if(value<0.3) return "green";
-    if(value<0.7) return "yellow";
-    return "red";
-  }
-  if(module==="NUR"){
-    if(value>50000) return "green";
-    if(value>20000) return "yellow";
-    return "red";
-  }
-  return "";
+// ------------------------------------------------------------
+// Barvy buněk podle hodnoty
+// ------------------------------------------------------------
+function colorCell(mod,val){
+  if(val>0.7) return "green";
+  if(val>0.4) return "orange";
+  return "red";
 }
 
-// --- Send (simulate) ---
+// ------------------------------------------------------------
+// Odeslání (simulace API)
+// ------------------------------------------------------------
 function send(){
-  let mod=editor.dataset.module||"ARC";
-  let payload=JSON.parse(editor.getValue());
-  let result=simulateOutput(mod,payload);
+  let mod = editor.dataset.module;
+  let ver = editor.dataset.version;
 
-  let row=table.insertRow(-1);
-  row.insertCell(0).innerText=mod;
-  row.insertCell(1).innerText=editor.dataset.version||"vX";
-  row.insertCell(2).innerHTML="<pre>"+JSON.stringify(payload,null,2)+"</pre>";
+  let payload;
+  try { payload = JSON.parse(editor.getValue()); }
+  catch(e){ alert("Neplatný JSON."); return; }
 
-  // Output with color
-  let outCell=row.insertCell(3);
-  let val="";
-  if(mod==="ARC") val=result.out.reliability;
-  else if(mod==="CR") val=result.out.chaos;
-  else if(mod==="NUR") val=result.out.stability;
-  outCell.innerHTML="<pre>"+JSON.stringify(result.out,null,2)+"</pre>";
-  outCell.className=colorCell(mod,val);
+  let res = simulateOutput(mod, payload);
 
-  row.insertCell(4).innerText=result.comment;
+  // Najdi hodnotu pro barvu
+  let val = Object.values(res.out)[0];
+
+  // Vložení do tabulky
+  let tbody = document.querySelector("#respTable tbody");
+  let row = tbody.insertRow(-1);
+
+  row.insertCell(0).innerText = mod;
+  row.insertCell(1).innerText = ver;
+  row.insertCell(2).innerHTML = "<pre>"+JSON.stringify(payload,null,2)+"</pre>";
+
+  let out = row.insertCell(3);
+  out.innerHTML = "<pre>"+JSON.stringify(res.out,null,2)+"</pre>";
+  out.className = colorCell(mod,val);
+
+  row.insertCell(4).innerText = res.comment;
 }
 </script>
 </body>
