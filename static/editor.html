@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8"/>
+<title>ARC / CR / NUR – JSON Editor</title>
+
+<style>
+body { font-family: Arial; margin: 20px; }
+#editor { width: 600px; height: 300px; border: 1px solid #666; }
+button { margin: 5px; padding: 6px 10px; cursor: pointer; }
+table { border-collapse: collapse; width: 100%; margin-top: 20px; }
+th, td { border: 1px solid #ccc; padding: 6px; vertical-align: top; }
+pre { margin: 0; white-space: pre-wrap; }
+.green { background-color: #c5f7c5; }
+.orange { background-color: #ffe9a8; }
+.red { background-color: #ffb3b3; }
+</style>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
+</head>
+
+<body>
+
+<h2>ARC / CR / NUR JSON Editor</h2>
+
+<div id="editor"></div>
+
+<h3>Přednastavené vstupy</h3>
+
+<button onclick="loadSample('ARC','A')">ARC – A</button>
+<button onclick="loadSample('ARC','B')">ARC – B</button>
+
+<button onclick="loadSample('CR','A')">CR – A</button>
+<button onclick="loadSample('CR','B')">CR – B</button>
+
+<button onclick="loadSample('NUR','A')">NUR – A</button>
+<button onclick="loadSample('NUR','B')">NUR – B</button>
+
+<button onclick="send()">Vyhodnotit</button>
+
+<h3>Výsledky</h3>
+
+<table id="respTable">
+<thead>
+<tr>
+  <th>Modul</th>
+  <th>Varianta</th>
+  <th>Vstup</th>
+  <th>Výstup</th>
+  <th>AI komentář</th>
+</tr>
+</thead>
+<tbody></tbody>
+</table>
+
+<script>
+// ---------------------------------------------
+// Inicializace editoru
+// ---------------------------------------------
+let editor = ace.edit("editor");
+editor.session.setMode("ace/mode/json");
+editor.setOption("fontSize", "14px");
+
+// metadata o tom, který preset je nahraný
+editor.dataset.module = "ARC";
+editor.dataset.version = "A";
+
+
+// ---------------------------------------------
+// Přesné a funkční presety
+// ---------------------------------------------
+const presets = {
+  ARC: {
+    A: {
+      signals: { CN:{concentration:0.60}, RU:{entropy:0.30}, US:{profit_bias:0.40} },
+      adapt_delta: { cn:0.01, ru:-0.01, us:0.0 }
+    },
+    B: {
+      signals: { CN:{concentration:0.90}, RU:{entropy:0.10}, US:{profit_bias:0.20} },
+      adapt_delta: { cn:0.03, ru:-0.02, us:-0.01 }
+    }
+  },
+  CR: {
+    A: {
+      signals: { CN:{concentration:0.20}, RU:{entropy:0.80}, US:{profit_bias:0.50} },
+      adapt_delta: { cn:-0.01, ru:0.03, us:0.01 }
+    },
+    B: {
+      signals: { CN:{concentration:0.10}, RU:{entropy:0.95}, US:{profit_bias:0.70} },
+      adapt_delta: { cn:-0.02, ru:0.05, us:0.02 }
+    }
+  },
+  NUR: {
+    A: {
+      signals: { CN:{concentration:0.50}, RU:{entropy:0.55}, US:{profit_bias:0.45} },
+      adapt_delta: { cn:0.00, ru:0.00, us:0.00 }
+    },
+    B: {
+      signals: { CN:{concentration:0.70}, RU:{entropy:0.30}, US:{profit_bias:0.50} },
+      adapt_delta: { cn:0.02, ru:-0.02, us:0.01 }
+    }
+  }
+};
+
+
+// ---------------------------------------------
+// Funkce pro načtení presetů
+// ---------------------------------------------
+function loadSample(module, version) {
+  const data = presets[module][version];
+
+  editor.dataset.module = module;
+  editor.dataset.version = version;
+
+  // kritický řádek: správné umístění, funguje spolehlivě
+  editor.setValue(JSON.stringify(data, null, 2), -1);
+}
+
+
+// ---------------------------------------------
+// Lokální simulace výstupů (nahrazuje API)
+// ---------------------------------------------
+function simulateOutput(module, payload){
+  const s = payload.signals;
+  const d = payload.adapt_delta;
+
+  if(module === "ARC"){
+    let rel = 1 - (s.RU.entropy * 0.6) + (s.CN.concentration * 0.4) - Math.abs(d.ru)*0.5;
+    rel = Math.max(0, Math.min(1, rel));
+    return { out:{ reliability: rel }, comment: rel>0.7?"Stabilní a konzistentní.":"Narušená jistota." };
+  }
+
+  if(module === "CR"){
+    let ch = s.RU.entropy*0.7 + (1-s.CN.concentration)*0.3 + Math.abs(d.ru)*0.4;
+    ch = Math.max(0, Math.min(1, ch));
+    return { out:{ chaos: ch }, comment: ch>0.7?"Vysoký chaos.":"Řízený chaos." };
+  }
+
+  if(module === "NUR"){
+    let st = (s.CN.concentration*0.4)+(1-s.RU.entropy)*0.4 - Math.abs(d.cn)*0.2;
+    st = Math.max(0, Math.min(1, st));
+    return { out:{ stability: st }, comment: st>0.7?"Vysoká osobní stabilita.":"Kolísání stability." };
+  }
+}
+
+
+// ---------------------------------------------
+// Barvení výsledku
+// ---------------------------------------------
+function colorCell(val){
+  if(val>0.7) return "green";
+  if(val>0.4) return "orange";
+  return "red";
+}
+
+
+// ---------------------------------------------
+// Vyhodnocení – simulace API
+// ---------------------------------------------
+function send(){
+  let mod = editor.dataset.module;
+  let ver = editor.dataset.version;
+
+  let payload;
+  try { payload = JSON.parse(editor.getValue()); }
+  catch(e){
+    alert("Neplatný JSON!");
+    return;
+  }
+
+  let result = simulateOutput(mod, payload);
+  let numericValue = Object.values(result.out)[0];
+
+  let row = document.querySelector("#respTable tbody").insertRow(-1);
+
+  row.insertCell(0).innerText = mod;
+  row.insertCell(1).innerText = ver;
+
+  row.insertCell(2).innerHTML = "<pre>"+JSON.stringify(payload, null, 2)+"</pre>";
+
+  const outCell = row.insertCell(3);
+  outCell.innerHTML = "<pre>"+JSON.stringify(result.out, null, 2)+"</pre>";
+  outCell.className = colorCell(numericValue);
+
+  row.insertCell(4).innerText = result.comment;
+}
+
+</script>
+
+</body>
+</html>
