@@ -1,14 +1,18 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect, Request
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-import os
+from fastapi.responses import HTMLResponse
+from pydantic import BaseModel
+from typing import Dict, Any, Optional
+import uvicorn
+import asyncio
+import json
+import math
+import statistics
 
 app = FastAPI(title='DEAT ARC–NUR Stabilizer', version='0.2')
 
-# Mount static directory
-static_dir = os.path.join(os.path.dirname(__file__), "static")
-app.mount('/static', StaticFiles(directory="static"), name="static")
+# static files
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 # Serve editor.html from static folder
 @app.get("/editor", include_in_schema=False)
