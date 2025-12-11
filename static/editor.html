@@ -28,20 +28,15 @@ pre { margin: 0; white-space: pre-wrap; }
 <div id="editor"></div>
 
 <h3>Přednastavené vstupy</h3>
-
 <button onclick="loadSample('ARC','A')">ARC – A</button>
 <button onclick="loadSample('ARC','B')">ARC – B</button>
-
 <button onclick="loadSample('CR','A')">CR – A</button>
 <button onclick="loadSample('CR','B')">CR – B</button>
-
 <button onclick="loadSample('NUR','A')">NUR – A</button>
 <button onclick="loadSample('NUR','B')">NUR – B</button>
-
 <button onclick="send()">Vyhodnotit</button>
 
 <h3>Výsledky</h3>
-
 <table id="respTable">
 <thead>
 <tr>
@@ -96,47 +91,36 @@ function loadSample(module, version) {
 }
 
 // ------------------------------
-// Simulace výstupu
-// ------------------------------
-function simulateOutput(module, payload){
-  const s = payload.signals;
-  const d = payload.adapt_delta;
-  if(module==="ARC"){
-    let rel = 1 - (s.RU.entropy*0.6) + (s.CN.concentration*0.4) - Math.abs(d.ru)*0.5;
-    rel = Math.max(0, Math.min(1, rel));
-    return { out:{ reliability: rel }, comment: rel>0.7?"Stabilní a konzistentní.":"Narušená jistota." };
-  }
-  if(module==="CR"){
-    let ch = s.RU.entropy*0.7 + (1-s.CN.concentration)*0.3 + Math.abs(d.ru)*0.4;
-    ch = Math.max(0, Math.min(1, ch));
-    return { out:{ chaos: ch }, comment: ch>0.7?"Vysoký chaos.":"Řízený chaos." };
-  }
-  if(module==="NUR"){
-    let st = (s.CN.concentration*0.4)+(1-s.RU.entropy)*0.4 - Math.abs(d.cn)*0.2;
-    st = Math.max(0, Math.min(1, st));
-    return { out:{ stability: st }, comment: st>0.7?"Vysoká osobní stabilita.":"Kolísání stability." };
-  }
-}
-
-// ------------------------------
-// Barvy hodnot
-// ------------------------------
-function colorCell(val){
-  if(val>0.7) return "green";
-  if(val>0.4) return "orange";
-  return "red";
-}
-
-// ------------------------------
-// Vyhodnocení
+// Odeslání přes WS
 // ------------------------------
 function send(){
-    let mod = editor.dataset.module;
-    let ver = editor.dataset.version;
-    let payload;
-    try { payload = JSON.parse(editor.getValue()); } catch(e){ alert("Neplatný JSON"); return; }
+  let mod = editor.dataset.module;
+  let ver = editor.dataset.version;
+  let payload;
+  try { payload = JSON.parse(editor.getValue()); } catch(e){ alert("Neplatný JSON"); return; }
 
-    sendPayloadWS(payload, mod, ver);
+  if(ws && ws.readyState === WebSocket.OPEN){
+      ws.send(JSON.stringify({ module: mod, version: ver, payload: payload }));
+  } else {
+      alert("WebSocket není připojen.");
+  }
+}
+
+// ------------------------------
+// Zobrazení výsledků po echo z WS
+// ------------------------------
+function displayResult(result){
+  let row = document.querySelector("#respTable tbody").insertRow(-1);
+  row.insertCell(0).innerText = result.module || "";
+  row.insertCell(1).innerText = result.version || "";
+  row.insertCell(2).innerHTML = "<pre>"+JSON.stringify(result.payload,null,2)+"</pre>";
+
+  const numericValue = Object.values(result.out || {0:0})[0];
+  const outCell = row.insertCell(3);
+  outCell.innerHTML = "<pre>"+JSON.stringify(result.out || {},null,2)+"</pre>";
+  outCell.className = numericValue>0.7?"green":(numericValue>0.4?"orange":"red");
+
+  row.insertCell(4).innerText = result.comment || "";
 }
 </script>
 
