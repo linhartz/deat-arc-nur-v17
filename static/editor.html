@@ -3,7 +3,6 @@
 <head>
 <meta charset="UTF-8"/>
 <title>ARC / CR / NUR – JSON Editor</title>
-
 <style>
 body { font-family: Arial; margin: 20px; }
 #editor { width: 600px; height: 300px; border: 1px solid #666; }
@@ -16,11 +15,9 @@ pre { margin: 0; white-space: pre-wrap; }
 .red { background-color: #ffb3b3; }
 </style>
 
-<!-- ACE editor -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/ace/1.4.12/ace.js"></script>
 <script src="/static/ws-client.js"></script>
 </head>
-
 <body>
 
 <h2>ARC / CR / NUR JSON Editor</h2>
@@ -58,9 +55,8 @@ let editor = ace.edit("editor");
 editor.session.setMode("ace/mode/json");
 editor.setOption("fontSize", "14px");
 
-// metadata o nahraném preset
-editor.dataset.module = "ARC";
-editor.dataset.version = "A";
+// metadata: inicializace objektu, aby dataset fungoval
+editor.dataset = { module: "ARC", version: "A" };
 
 // ------------------------------
 // Presety
@@ -91,7 +87,39 @@ function loadSample(module, version) {
 }
 
 // ------------------------------
-// Odeslání přes WS
+// Simulace výstupu
+// ------------------------------
+function simulateOutput(module, payload){
+  const s = payload.signals;
+  const d = payload.adapt_delta;
+  if(module==="ARC"){
+    let rel = 1 - (s.RU.entropy*0.6) + (s.CN.concentration*0.4) - Math.abs(d.ru)*0.5;
+    rel = Math.max(0, Math.min(1, rel));
+    return { out:{ reliability: rel }, comment: rel>0.7?"Stabilní a konzistentní.":"Narušená jistota." };
+  }
+  if(module==="CR"){
+    let ch = s.RU.entropy*0.7 + (1-s.CN.concentration)*0.3 + Math.abs(d.ru)*0.4;
+    ch = Math.max(0, Math.min(1, ch));
+    return { out:{ chaos: ch }, comment: ch>0.7?"Vysoký chaos.":"Řízený chaos." };
+  }
+  if(module==="NUR"){
+    let st = (s.CN.concentration*0.4)+(1-s.RU.entropy)*0.4 - Math.abs(d.cn)*0.2;
+    st = Math.max(0, Math.min(1, st));
+    return { out:{ stability: st }, comment: st>0.7?"Vysoká osobní stabilita.":"Kolísání stability." };
+  }
+}
+
+// ------------------------------
+// Barvy buněk
+// ------------------------------
+function colorCell(val){
+  if(val>0.7) return "green";
+  if(val>0.4) return "orange";
+  return "red";
+}
+
+// ------------------------------
+// Vyhodnocení / Simulace
 // ------------------------------
 function send(){
   let mod = editor.dataset.module;
@@ -99,28 +127,23 @@ function send(){
   let payload;
   try { payload = JSON.parse(editor.getValue()); } catch(e){ alert("Neplatný JSON"); return; }
 
-  if(ws && ws.readyState === WebSocket.OPEN){
-      ws.send(JSON.stringify({ module: mod, version: ver, payload: payload }));
-  } else {
-      alert("WebSocket není připojen.");
-  }
-}
+  // Simulace lokální
+  let result = simulateOutput(mod, payload);
+  let numericValue = Object.values(result.out)[0];
 
-// ------------------------------
-// Zobrazení výsledků po echo z WS
-// ------------------------------
-function displayResult(result){
   let row = document.querySelector("#respTable tbody").insertRow(-1);
-  row.insertCell(0).innerText = result.module || "";
-  row.insertCell(1).innerText = result.version || "";
-  row.insertCell(2).innerHTML = "<pre>"+JSON.stringify(result.payload,null,2)+"</pre>";
-
-  const numericValue = Object.values(result.out || {0:0})[0];
+  row.insertCell(0).innerText = mod;
+  row.insertCell(1).innerText = ver;
+  row.insertCell(2).innerHTML = "<pre>"+JSON.stringify(payload,null,2)+"</pre>";
   const outCell = row.insertCell(3);
-  outCell.innerHTML = "<pre>"+JSON.stringify(result.out || {},null,2)+"</pre>";
-  outCell.className = numericValue>0.7?"green":(numericValue>0.4?"orange":"red");
+  outCell.innerHTML = "<pre>"+JSON.stringify(result.out,null,2)+"</pre>";
+  outCell.className = colorCell(numericValue);
+  row.insertCell(4).innerText = result.comment;
 
-  row.insertCell(4).innerText = result.comment || "";
+  // Poslat přes WebSocket (pokud připojen)
+  if(window.ws && window.ws.readyState===WebSocket.OPEN){
+    window.ws.send(JSON.stringify({module: mod, version: ver, payload: payload}));
+  }
 }
 </script>
 
